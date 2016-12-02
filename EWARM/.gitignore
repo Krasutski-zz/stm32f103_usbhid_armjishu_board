@@ -1,0 +1,5 @@
+settings
+stm32f103_usb_control_devb
+*.ewd
+*.ewt
+*.dep

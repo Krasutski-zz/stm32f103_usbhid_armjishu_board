@@ -93,7 +93,6 @@
   * @{
   */
 
-
 static uint8_t  USBD_HID_Init (USBD_HandleTypeDef *pdev,
                                uint8_t cfgidx);
 
@@ -108,6 +107,13 @@ static uint8_t  *USBD_HID_GetCfgDesc (uint16_t *length);
 static uint8_t  *USBD_HID_GetDeviceQualifierDesc (uint16_t *length);
 
 static uint8_t  USBD_HID_DataIn (USBD_HandleTypeDef *pdev, uint8_t epnum);
+
+static uint8_t  USBD_HID_DataOut (USBD_HandleTypeDef *pdev,
+                              uint8_t epnum);
+
+static uint8_t usb_rx_buffer[USB_FS_MAX_PACKET_SIZE];
+
+extern void ReportReceived(uint8_t ReportNum, uint8_t *Data);
 /**
   * @}
   */
@@ -124,7 +130,7 @@ USBD_ClassTypeDef  USBD_HID =
   NULL, /*EP0_TxSent*/
   NULL, /*EP0_RxReady*/
   USBD_HID_DataIn, /*DataIn*/
-  NULL, /*DataOut*/
+  USBD_HID_DataOut, /*DataOut*/
   NULL, /*SOF */
   NULL,
   NULL,
@@ -169,28 +175,27 @@ __ALIGN_BEGIN static uint8_t USBD_HID_CfgDesc[USB_HID_CONFIG_DESC_SIZ]  __ALIGN_
   0x00,         /*bCountryCode: Hardware target country*/
   0x01,         /*bNumDescriptors: Number of HID class descriptors to follow*/
   0x22,         /*bDescriptorType*/
-#warning check here up and down
   HID_REPORT_DESC_SIZE,/*wItemLength: Total length of Report descriptor*/
   0x00,
   /******************** Descriptor of Mouse endpoint ********************/
   /* 27 */
-  0x07,          /*bLength: Endpoint Descriptor size*/
-  USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+  0x07,                     /*bLength: Endpoint Descriptor size*/
+  USB_DESC_TYPE_ENDPOINT,   /*bDescriptorType:*/
 
-  HID_EPIN_ADDR,     /*bEndpointAddress: Endpoint Address (IN)*/
-  0x03,          /*bmAttributes: Interrupt endpoint*/
-  HID_EP_SIZE, /*wMaxPacketSize: 4 Byte max */
+  HID_EPIN_ADDR,            /*bEndpointAddress: Endpoint Address (IN)*/
+  0x03,                     /*bmAttributes: Interrupt endpoint*/
+  HID_EP_SIZE,              /*wMaxPacketSize: 4 Byte max */
   0x00,
-  HID_FS_BINTERVAL,          /*bInterval: Polling Interval (10 ms)*/
+  HID_FS_BINTERVAL,         /*bInterval: Polling Interval (10 ms)*/
   /* 34 */
-  0x07,          /*bLength: Endpoint Descriptor size*/
-  USB_DESC_TYPE_ENDPOINT, /*bDescriptorType:*/
+  0x07,                     /*bLength: Endpoint Descriptor size*/
+  USB_DESC_TYPE_ENDPOINT,   /*bDescriptorType:*/
 
-  HID_EPOUT_ADDR,   /*bEndpointAddress: Endpoint Address (OUT)*/
-  0x03,          /*bmAttributes: Interrupt endpoint*/
-  HID_EP_SIZE, /*wMaxPacketSize: 4 Byte max */
+  HID_EPOUT_ADDR,           /*bEndpointAddress: Endpoint Address (OUT)*/
+  0x03,                     /*bmAttributes: Interrupt endpoint*/
+  HID_EP_SIZE,              /*wMaxPacketSize: 4 Byte max */
   0x00,
-  HID_FS_BINTERVAL,          /*bInterval: Polling Interval (10 ms)*/
+  HID_FS_BINTERVAL,         /*bInterval: Polling Interval (10 ms)*/
   /* 41 */
 } ;
 
@@ -226,48 +231,48 @@ __ALIGN_BEGIN static uint8_t USBD_HID_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_
 
 __ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_REPORT_DESC_SIZE]  __ALIGN_END =
 {
-    0x06, 0x00, 0xff,              // USAGE_PAGE (Generic Desktop)
-    0x09, 0x01,                    // USAGE (Vendor Usage 1)
-    0xa1, 0x01,                    // COLLECTION (Application)
-    0x85, 0x01,                    //   REPORT_ID (1)
-    0x09, 0x01,                    //   USAGE (Vendor Usage 1)
-    0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
-    0x25, 0x01,                    //   LOGICAL_MAXIMUM (1)
-    0x75, 0x08,                    //   REPORT_SIZE (8)
-    0x95, 0x01,                    //   REPORT_COUNT (1)
-    0xb1, 0x82,                    //   FEATURE (Data,Var,Abs,Vol)
-    0x85, 0x01,                    //   REPORT_ID (1)
-    0x09, 0x01,                    //   USAGE (Vendor Usage 1)
-    0x91, 0x82,                    //   OUTPUT (Data,Var,Abs,Vol)
+    0x06, 0x00, 0xff,               // USAGE_PAGE (Generic Desktop)
+    0x09, 0x01,                     // USAGE (Vendor Usage 1)
+    0xa1, 0x01,                     // COLLECTION (Application)
+    0x85, 0x01,                     //   REPORT_ID (1)
+    0x09, 0x01,                     //   USAGE (Vendor Usage 1)
+    0x15, 0x00,                     //   LOGICAL_MINIMUM (0)
+    0x25, 0x01,                     //   LOGICAL_MAXIMUM (1)
+    0x75, 0x08,                     //   REPORT_SIZE (8)
+    0x95, 0x04,                     //   REPORT_COUNT (1)
+    0xb1, 0x82,                     //   FEATURE (Data,Var,Abs,Vol)
+    0x85, 0x01,                     //   REPORT_ID (1)
+    0x09, 0x01,                     //   USAGE (Vendor Usage 1)
+    0x91, 0x82,                     //   OUTPUT (Data,Var,Abs,Vol)
 
-    0x85, 0x02,                    //   REPORT_ID (2)
-    0x09, 0x02,                    //   USAGE (Vendor Usage 2)
-    0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
-    0x25, 0x01,                    //   LOGICAL_MAXIMUM (1)
-    0x75, 0x08,                    //   REPORT_SIZE (8)
-    0x95, 0x01,                    //   REPORT_COUNT (1)
-    0xb1, 0x82,                    //   FEATURE (Data,Var,Abs,Vol)
-    0x85, 0x02,                    //   REPORT_ID (2)
-    0x09, 0x02,                    //   USAGE (Vendor Usage 2)
-    0x91, 0x82,                    //   OUTPUT (Data,Var,Abs,Vol)
+    0x85, 0x02,                     //   REPORT_ID (2)
+    0x09, 0x02,                     //   USAGE (Vendor Usage 2)
+    0x15, 0x00,                     //   LOGICAL_MINIMUM (0)
+    0x25, 0x01,                     //   LOGICAL_MAXIMUM (1)
+    0x75, 0x08,                     //   REPORT_SIZE (8)
+    0x95, 0x04,                     //   REPORT_COUNT (1)
+    0xb1, 0x82,                     //   FEATURE (Data,Var,Abs,Vol)
+    0x85, 0x02,                     //   REPORT_ID (2)
+    0x09, 0x02,                     //   USAGE (Vendor Usage 2)
+    0x91, 0x82,                     //   OUTPUT (Data,Var,Abs,Vol)
 
-    0x85, 0x03,                    //   REPORT_ID (3)
-    0x09, 0x03,                    //   USAGE (Vendor Usage 3)
-    0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
-    0x26, 0xff, 0x00,              //   LOGICAL_MAXIMUM (255)
-    0x75, 0x08,                    //   REPORT_SIZE (8)
-    0x95, (1),                    //   REPORT_COUNT (N)
-    0xb1, 0x82,                    //   FEATURE (Data,Var,Abs,Vol)
-    0x85, 0x03,                    //   REPORT_ID (3)
-    0x09, 0x03,                    //   USAGE (Vendor Usage 3)
-    0x91, 0x82,                    //   OUTPUT (Data,Var,Abs,Vol)
+    0x85, 0x03,                     //   REPORT_ID (3)
+    0x09, 0x03,                     //   USAGE (Vendor Usage 3)
+    0x15, 0x00,                     //   LOGICAL_MINIMUM (0)
+    0x26, 0xff, 0x00,               //   LOGICAL_MAXIMUM (255)
+    0x75, 0x08,                     //   REPORT_SIZE (8)
+    0x95, 0x04,                     //   REPORT_COUNT (N)
+    0xb1, 0x82,                     //   FEATURE (Data,Var,Abs,Vol)
+    0x85, 0x03,                     //   REPORT_ID (3)
+    0x09, 0x03,                     //   USAGE (Vendor Usage 3)
+    0x91, 0x82,                     //   OUTPUT (Data,Var,Abs,Vol)
 
-    0x85, 0x04,                    //   REPORT_ID (4)
-    0x09, 0x04,                    //   USAGE (Vendor Usage 4)
-    0x75, 0x08,                    //   REPORT_SIZE (8)
-    0x95, (4),                    //   REPORT_COUNT (N)
-    0x81, 0x82,                    //   INPUT (Data,Var,Abs,Vol)
-    0xc0                           // END_COLLECTION
+    0x85, 0x04,                     //   REPORT_ID (4)
+    0x09, 0x04,                     //   USAGE (Vendor Usage 4)
+    0x75, 0x08,                     //   REPORT_SIZE (8)
+    0x95, 0x04,                     //   REPORT_COUNT (N)
+    0x81, 0x82,                     //   INPUT (Data,Var,Abs,Vol)
+    0xc0                            // END_COLLECTION
 };
 
 /**
@@ -277,6 +282,7 @@ __ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_REPORT_DESC_SIZE]  __ALIGN
 /** @defgroup USBD_HID_Private_Functions
   * @{
   */
+
 
 /**
   * @brief  USBD_HID_Init
@@ -301,6 +307,12 @@ static uint8_t  USBD_HID_Init (USBD_HandleTypeDef *pdev,
                  HID_EPOUT_ADDR,
                  USBD_EP_TYPE_INTR,
                  HID_EP_SIZE);
+
+  /* Start receive */
+  USBD_LL_PrepareReceive(pdev,
+                 HID_EPOUT_ADDR,
+                 usb_rx_buffer,
+                 USB_FS_MAX_PACKET_SIZE);
 
   pdev->pClassData = USBD_malloc(sizeof (USBD_HID_HandleTypeDef));
 
@@ -521,6 +533,22 @@ static uint8_t  *USBD_HID_GetDeviceQualifierDesc (uint16_t *length)
 {
   *length = sizeof (USBD_HID_DeviceQualifierDesc);
   return USBD_HID_DeviceQualifierDesc;
+}
+
+static uint8_t  USBD_HID_DataOut (USBD_HandleTypeDef *pdev,
+                                  uint8_t epnum)
+{
+	if (epnum != (HID_EPOUT_ADDR & 0x0F))
+		return USBD_FAIL;
+
+    ReportReceived(usb_rx_buffer[0], &usb_rx_buffer[1]);
+
+    USBD_LL_PrepareReceive(pdev,
+                           HID_EPOUT_ADDR,
+                           usb_rx_buffer,
+                           USB_FS_MAX_PACKET_SIZE);
+
+	return USBD_OK;
 }
 
 /**

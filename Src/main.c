@@ -78,6 +78,11 @@ void USB_Reconnect(void)
 
    HAL_Delay(100);
 }
+ void ReportReceived(uint8_t ReportNum, uint8_t *Data)
+ {
+   //TODO, copy mem and parse data
+ }
+
 /* USER CODE END 0 */
 
 int main(void)
@@ -106,10 +111,17 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  const uint32_t TEST_STR_LEN = 4U;
+  uint8_t test_str[4U];
+  int count = 0;
   while (1)
   {
-  /* USER CODE END WHILE */
+      snprintf((char*)test_str, TEST_STR_LEN, "T=%01X", count++);
+      count %=0x10;
+      HAL_Delay(1000);
 
+      SendReport(4, test_str, TEST_STR_LEN);
+  /* USER CODE END WHILE */
   /* USER CODE BEGIN 3 */
 
   }
